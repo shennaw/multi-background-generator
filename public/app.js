@@ -15,7 +15,8 @@ const ui = {
   detailList: el('detailList'), detailCount: el('detailCount'),
   preview: el('preview'), status: el('status'), download: el('download'),
   layerTabs: el('layerTabs'), typography: el('typography'),
-  fontFamily: el('fontFamily'), bold: el('bold'), italic: el('italic'), preset: el('preset'),
+  fontFamily: el('fontFamily'), bold: el('bold'), italic: el('italic'),
+  color: el('color'), alignRow: el('alignRow'), preset: el('preset'),
   scale: el('scale'), posX: el('posX'), posY: el('posY'),
   scaleValue: el('scaleValue'), xValue: el('xValue'), yValue: el('yValue'),
   reset: el('reset'), applyAll: el('applyAll'), allLayers: el('allLayers'),
@@ -26,9 +27,9 @@ const ui = {
 // Placement is per background, per layer. x/y run -100..100 across the canvas.
 const DEFAULTS = {
   object: { scale: 100, x: 0, y: 0 },
-  brand: { scale: 100, x: 0, y: -78, font: '', bold: true, italic: false },
-  name: { scale: 100, x: 0, y: 58, font: '', bold: true, italic: false },
-  partNumber: { scale: 100, x: 0, y: 74, font: '', bold: false, italic: false },
+  brand: { scale: 100, x: 0, y: -78, font: '', bold: true, italic: false, color: '#ffffff', align: 'center' },
+  name: { scale: 100, x: 0, y: 58, font: '', bold: true, italic: false, color: '#ffffff', align: 'center' },
+  partNumber: { scale: 100, x: 0, y: 74, font: '', bold: false, italic: false, color: '#ffffff', align: 'center' },
 };
 
 // Font pairings the six storefronts use. '' means the system fallback stack.
@@ -284,6 +285,12 @@ function syncControls() {
     ui.italic.disabled = disabled;
     ui.bold.classList.toggle('on', Boolean(value.bold));
     ui.italic.classList.toggle('on', Boolean(value.italic));
+    ui.color.value = value.color ?? '#ffffff';
+    ui.color.disabled = disabled;
+    for (const button of ui.alignRow.querySelectorAll('.align')) {
+      button.classList.toggle('on', button.dataset.align === (value.align ?? 'center'));
+      button.disabled = disabled;
+    }
   }
 }
 
@@ -303,6 +310,11 @@ const targetLayers = () => (ui.allLayers.checked ? LAYERS : [state.layer]);
 ui.fontFamily.addEventListener('change', () => updateLayer({ font: ui.fontFamily.value }));
 ui.bold.addEventListener('click', () => updateLayer({ bold: !activeLayer()?.bold }));
 ui.italic.addEventListener('click', () => updateLayer({ italic: !activeLayer()?.italic }));
+ui.color.addEventListener('input', () => updateLayer({ color: ui.color.value }));
+ui.alignRow.addEventListener('click', (e) => {
+  const button = e.target.closest('.align');
+  if (button) updateLayer({ align: button.dataset.align });
+});
 
 ui.preset.addEventListener('change', () => {
   const background = activeBackground();
@@ -431,35 +443,42 @@ function fontString(t, kind, pixels) {
   return `${t.italic ? 'italic ' : ''}${weight} ${pixels}px ${family}`;
 }
 
+// How much room the text has before it runs off the canvas, given its anchor.
+function availableWidth(size, cx, align) {
+  const margin = size * 0.04;
+  if (align === 'left') return Math.max(size * 0.1, size - cx - margin);
+  if (align === 'right') return Math.max(size * 0.1, cx - margin);
+  return Math.max(size * 0.1, Math.min(cx, size - cx) * 2 - margin);
+}
+
 function drawTextLayer(ctx, size, text, t, kind) {
   if (!text) return;
 
   const fontSize = size * BASE_SIZE[kind] * (t.scale / 100);
+  const align = t.align ?? 'center';
+  const cx = toCanvasX(t.x, size);
+  const cy = toCanvasY(t.y, size);
 
   ctx.save();
   ctx.font = fontString(t, kind, fontSize);
-  ctx.textAlign = 'center';
+  ctx.textAlign = align;
   ctx.textBaseline = 'middle';
+  ctx.fillStyle = t.color ?? '#ffffff';
   // No band behind the text — a soft shadow keeps it legible over busy photos.
   ctx.shadowColor = 'rgba(0,0,0,0.55)';
   ctx.shadowBlur = fontSize * 0.35;
   ctx.shadowOffsetY = fontSize * 0.06;
 
-  const cx = toCanvasX(t.x, size);
-  const cy = toCanvasY(t.y, size);
-
   if (kind === 'name') {
-    const lines = wrapText(ctx, text, size * 0.9, 2);
+    const lines = wrapText(ctx, text, availableWidth(size, cx, align), 2);
     const lineHeight = fontSize * 1.2;
     let y = cy - ((lines.length - 1) * lineHeight) / 2;
-    ctx.fillStyle = '#ffffff';
     for (const line of lines) {
       ctx.fillText(line, cx, y);
       y += lineHeight;
     }
   } else {
     ctx.letterSpacing = `${fontSize * (kind === 'brand' ? 0.14 : 0.08)}px`;
-    ctx.fillStyle = kind === 'brand' ? 'rgba(255,255,255,0.92)' : '#ffffff';
     ctx.fillText(text.toUpperCase(), cx, cy);
   }
   ctx.restore();

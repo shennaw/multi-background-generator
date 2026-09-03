@@ -255,3 +255,14 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .btn-toggle { flex: 0 0 44px; font-size: 15px; line-height: 1; }
 .btn-toggle.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 #typography[hidden] { display: none; }
+
+.color-swatch {
+  flex: 0 0 44px;
+  height: 36px;
+  padding: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.btn-toggle.align { flex: 1; font-size: 14px; }

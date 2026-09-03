@@ -30,9 +30,12 @@ Your browser opens at http://localhost:5173.
    zip exactly as uploaded, with no compositing or re-encoding.
 4. Click a background thumbnail to select it, then pick a layer —
    **Object**, **Item name**, **Brand**, or **Part no.** Each layer has its own
-   scale, position, font, bold and italic setting, all stored per background —
+   scale, position, font, bold, italic, colour and alignment, all stored per
+   background —
    so each of the six storefronts can use its own typography. Drag on the canvas
    to move the selected layer, or use the sliders.
+   Alignment sets which edge of the text sits on the anchor point, so left- or
+   right-aligned layers stay on a shared margin no matter how long the text is.
    **Store font preset** applies a storefront's font pairing in one click.
    **Reset to center** restores that layer's default and **Apply to all 6**
    copies it to every background; tick **Buttons below act on all three
