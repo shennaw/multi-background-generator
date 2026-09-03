@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cover Generator</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brandmark">Cover<span>Generator</span></div>
+  <div class="topbar-actions">
+    <span id="status" class="status"></span>
+    <button id="download" class="btn btn-primary" disabled>Download sku.zip</button>
+  </div>
+</header>
+
+<main class="layout">
+  <aside class="panel panel-left">
+    <section class="block">
+      <h2>Product details</h2>
+      <label class="field">
+        <span>SKU</span>
+        <input id="sku" type="text" placeholder="ABC-1234" autocomplete="off" />
+        <small id="sku-hint">Used as the zip filename.</small>
+      </label>
+      <label class="field">
+        <span>Item name</span>
+        <input id="name" type="text" placeholder="Brake Disc Rotor 320mm" autocomplete="off" />
+      </label>
+      <label class="field">
+        <span>Brand</span>
+        <input id="brandName" type="text" placeholder="Scarlet Parts" autocomplete="off" />
+      </label>
+    </section>
+
+    <section class="block">
+      <h2>Object photo</h2>
+      <div id="objectDrop" class="drop">
+        <input id="objectInput" type="file" accept="image/*" hidden />
+        <div class="drop-inner">
+          <strong>Drop object photo</strong>
+          <small>or click to browse — PNG with transparency works best</small>
+        </div>
+        <img id="objectThumb" alt="" hidden />
+      </div>
+      <button id="clearObject" class="btn btn-ghost btn-small" hidden>Remove object</button>
+    </section>
+
+    <section class="block">
+      <h2>Backgrounds <span class="counter"><span id="bgCount">0</span>/6</span></h2>
+      <div id="bgDrop" class="drop drop-slim">
+        <input id="bgInput" type="file" accept="image/*" multiple hidden />
+        <div class="drop-inner">
+          <strong>Drop up to 6 backgrounds</strong>
+          <small>or click to browse</small>
+        </div>
+      </div>
+      <div id="bgList" class="thumbs"></div>
+    </section>
+
+    <section class="block">
+      <h2>Detail photos <span class="counter" id="detailCount">0</span></h2>
+      <div id="detailDrop" class="drop drop-slim">
+        <input id="detailInput" type="file" accept="image/*" multiple hidden />
+        <div class="drop-inner">
+          <strong>Drop detail photos</strong>
+          <small>added to the zip untouched as detail_1, detail_2, …</small>
+        </div>
+      </div>
+      <div id="detailList" class="thumbs"></div>
+    </section>
+  </aside>
+
+  <section class="stage">
+    <div class="stage-canvas">
+      <canvas id="preview" width="1200" height="1200"></canvas>
+      <p class="hint">Drag to move the selected layer · use the Scale slider to resize</p>
+    </div>
+  </section>
+
+  <aside class="panel panel-right">
+    <section class="block">
+      <h2>Placement</h2>
+      <p class="muted" id="editingLabel">Editing: background 1</p>
+
+      <div class="segmented" id="layerTabs">
+        <button class="seg active" data-layer="object">Object</button>
+        <button class="seg" data-layer="name">Item name</button>
+        <button class="seg" data-layer="brand">Brand</button>
+      </div>
+
+      <label class="field">
+        <span>Scale <em id="scaleValue">100%</em></span>
+        <input id="scale" type="range" min="5" max="300" step="1" value="100" />
+      </label>
+      <label class="field">
+        <span>Horizontal <em id="xValue">0</em></span>
+        <input id="posX" type="range" min="-100" max="100" step="1" value="0" />
+      </label>
+      <label class="field">
+        <span>Vertical <em id="yValue">0</em></span>
+        <input id="posY" type="range" min="-100" max="100" step="1" value="0" />
+      </label>
+
+      <label class="check">
+        <input id="allLayers" type="checkbox" />
+        <span>Buttons below act on all three layers</span>
+      </label>
+
+      <div class="btn-row">
+        <button id="reset" class="btn">Reset to center</button>
+        <button id="applyAll" class="btn btn-ghost">Apply to all 6</button>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>Output</h2>
+      <label class="field">
+        <span>Size</span>
+        <select id="outputSize">
+          <option value="1000">1000 × 1000</option>
+          <option value="1200" selected>1200 × 1200</option>
+          <option value="1600">1600 × 1600</option>
+          <option value="2000">2000 × 2000</option>
+        </select>
+      </label>
+      <label class="check">
+        <input id="showText" type="checkbox" checked />
+        <span>Show name &amp; brand on the image</span>
+      </label>
+    </section>
+  </aside>
+</main>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

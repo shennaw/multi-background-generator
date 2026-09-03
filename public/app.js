@@ -1,0 +1,455 @@
+import { createZip } from './zip.js';
+
+const MAX_BACKGROUNDS = 6;
+const LAYERS = ['object', 'name', 'brand'];
+
+const el = (id) => document.getElementById(id);
+const ui = {
+  sku: el('sku'), name: el('name'), brandName: el('brandName'),
+  objectDrop: el('objectDrop'), objectInput: el('objectInput'),
+  objectThumb: el('objectThumb'), clearObject: el('clearObject'),
+  bgDrop: el('bgDrop'), bgInput: el('bgInput'), bgList: el('bgList'), bgCount: el('bgCount'),
+  detailDrop: el('detailDrop'), detailInput: el('detailInput'),
+  detailList: el('detailList'), detailCount: el('detailCount'),
+  preview: el('preview'), status: el('status'), download: el('download'),
+  layerTabs: el('layerTabs'),
+  scale: el('scale'), posX: el('posX'), posY: el('posY'),
+  scaleValue: el('scaleValue'), xValue: el('xValue'), yValue: el('yValue'),
+  reset: el('reset'), applyAll: el('applyAll'), allLayers: el('allLayers'),
+  editingLabel: el('editingLabel'),
+  outputSize: el('outputSize'), showText: el('showText'),
+};
+
+// Placement is per background, per layer. x/y run -100..100 across the canvas.
+const DEFAULTS = {
+  object: { scale: 100, x: 0, y: 0 },
+  brand: { scale: 100, x: 0, y: 58 },
+  name: { scale: 100, x: 0, y: 72 },
+};
+
+const newTransform = () => ({
+  object: { ...DEFAULTS.object },
+  brand: { ...DEFAULTS.brand },
+  name: { ...DEFAULTS.name },
+});
+
+const state = {
+  object: null,           // { img, url }
+  backgrounds: [],        // { img, url, transform }
+  details: [],            // { file, url } — copied into the zip untouched
+  active: 0,
+  layer: 'object',
+};
+
+const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
+
+/* ---------- loading images ---------- */
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => resolve({ img, url });
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(`Could not read ${file.name}`)); };
+    img.src = url;
+  });
+}
+
+const imageFiles = (list) => Array.from(list).filter((f) => f.type.startsWith('image/'));
+
+async function setObject(file) {
+  const loaded = await loadImage(file);
+  if (state.object) URL.revokeObjectURL(state.object.url);
+  state.object = loaded;
+  ui.objectThumb.src = loaded.url;
+  ui.objectThumb.hidden = false;
+  ui.objectDrop.classList.add('has-image');
+  ui.clearObject.hidden = false;
+  render();
+}
+
+async function addBackgrounds(files) {
+  const room = MAX_BACKGROUNDS - state.backgrounds.length;
+  if (room <= 0) {
+    setStatus(`Already at ${MAX_BACKGROUNDS} backgrounds — remove one first.`);
+    return;
+  }
+  for (const file of files.slice(0, room)) {
+    const loaded = await loadImage(file);
+    state.backgrounds.push({ ...loaded, transform: newTransform() });
+  }
+  if (files.length > room) setStatus(`Added ${room} — the ${MAX_BACKGROUNDS} slot limit is full.`);
+  state.active = Math.min(state.active, state.backgrounds.length - 1);
+  syncBackgrounds();
+}
+
+async function addDetails(files) {
+  for (const file of files) {
+    state.details.push({ file, url: URL.createObjectURL(file) });
+  }
+  syncDetails();
+}
+
+function syncDetails() {
+  ui.detailCount.textContent = state.details.length;
+  ui.detailList.replaceChildren(...state.details.map((detail, i) => {
+    const item = document.createElement('div');
+    item.className = 'thumb';
+    item.innerHTML = `<img alt=""><span class="index">${i + 1}</span><button class="remove" title="Remove">\u00d7</button>`;
+    item.querySelector('img').src = detail.url;
+    item.title = detail.file.name;
+    item.querySelector('.remove').addEventListener('click', (e) => {
+      e.stopPropagation();
+      URL.revokeObjectURL(detail.url);
+      state.details.splice(i, 1);
+      syncDetails();
+    });
+    return item;
+  }));
+}
+
+/* ---------- drop zones ---------- */
+
+function wireDrop(zone, input, onFiles) {
+  zone.addEventListener('click', () => input.click());
+  input.addEventListener('change', () => {
+    if (input.files.length) onFiles(imageFiles(input.files));
+    input.value = '';
+  });
+  ['dragenter', 'dragover'].forEach((type) =>
+    zone.addEventListener(type, (e) => { e.preventDefault(); zone.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach((type) =>
+    zone.addEventListener(type, (e) => { e.preventDefault(); zone.classList.remove('over'); }));
+  zone.addEventListener('drop', (e) => {
+    const files = imageFiles(e.dataTransfer.files);
+    if (files.length) onFiles(files);
+  });
+}
+
+wireDrop(ui.objectDrop, ui.objectInput, (files) => setObject(files[0]).catch(fail));
+wireDrop(ui.bgDrop, ui.bgInput, (files) => addBackgrounds(files).catch(fail));
+wireDrop(ui.detailDrop, ui.detailInput, (files) => addDetails(files).catch(fail));
+
+ui.clearObject.addEventListener('click', (e) => {
+  e.stopPropagation();
+  URL.revokeObjectURL(state.object.url);
+  state.object = null;
+  ui.objectThumb.hidden = true;
+  ui.objectThumb.removeAttribute('src');
+  ui.objectDrop.classList.remove('has-image');
+  ui.clearObject.hidden = true;
+  render();
+});
+
+/* ---------- background list ---------- */
+
+function syncBackgrounds() {
+  ui.bgCount.textContent = state.backgrounds.length;
+  ui.bgList.replaceChildren(...state.backgrounds.map((bg, i) => {
+    const item = document.createElement('div');
+    item.className = 'thumb' + (i === state.active ? ' active' : '');
+    item.innerHTML = `<img alt=""><span class="index">${i + 1}</span><button class="remove" title="Remove">×</button>`;
+    item.querySelector('img').src = bg.url;
+    item.addEventListener('click', () => { state.active = i; syncBackgrounds(); });
+    item.querySelector('.remove').addEventListener('click', (e) => {
+      e.stopPropagation();
+      URL.revokeObjectURL(bg.url);
+      state.backgrounds.splice(i, 1);
+      state.active = Math.max(0, Math.min(state.active, state.backgrounds.length - 1));
+      syncBackgrounds();
+    });
+    return item;
+  }));
+  syncControls();
+  render();
+}
+
+/* ---------- placement controls ---------- */
+
+const activeBackground = () => state.backgrounds[state.active] ?? null;
+const activeLayer = () => activeBackground()?.transform[state.layer] ?? null;
+
+ui.layerTabs.addEventListener('click', (e) => {
+  const tab = e.target.closest('.seg');
+  if (!tab) return;
+  state.layer = tab.dataset.layer;
+  syncControls();
+});
+
+function syncControls() {
+  const layer = activeLayer();
+  const disabled = !layer;
+  [ui.scale, ui.posX, ui.posY, ui.reset, ui.applyAll, ui.allLayers].forEach((c) => { c.disabled = disabled; });
+
+  for (const tab of ui.layerTabs.querySelectorAll('.seg')) {
+    tab.classList.toggle('active', tab.dataset.layer === state.layer);
+    tab.disabled = disabled;
+  }
+
+  ui.editingLabel.textContent = disabled
+    ? 'Add a background to start placing.'
+    : `Editing: background ${state.active + 1} of ${state.backgrounds.length}`;
+
+  const value = layer ?? DEFAULTS[state.layer];
+  ui.scale.value = value.scale;
+  ui.posX.value = value.x;
+  ui.posY.value = value.y;
+  ui.scaleValue.textContent = `${Math.round(value.scale)}%`;
+  ui.xValue.textContent = Math.round(value.x);
+  ui.yValue.textContent = Math.round(value.y);
+}
+
+function updateLayer(patch) {
+  const layer = activeLayer();
+  if (!layer) return;
+  Object.assign(layer, patch);
+  layer.scale = clamp(layer.scale, 5, 300);
+  layer.x = clamp(layer.x, -100, 100);
+  layer.y = clamp(layer.y, -100, 100);
+  syncControls();
+  render();
+}
+
+const targetLayers = () => (ui.allLayers.checked ? LAYERS : [state.layer]);
+
+ui.scale.addEventListener('input', () => updateLayer({ scale: Number(ui.scale.value) }));
+ui.posX.addEventListener('input', () => updateLayer({ x: Number(ui.posX.value) }));
+ui.posY.addEventListener('input', () => updateLayer({ y: Number(ui.posY.value) }));
+
+ui.reset.addEventListener('click', () => {
+  const background = activeBackground();
+  if (!background) return;
+  for (const key of targetLayers()) background.transform[key] = { ...DEFAULTS[key] };
+  syncControls();
+  render();
+  setStatus(ui.allLayers.checked ? 'All layers reset.' : `${state.layer} reset to default position.`);
+});
+
+ui.applyAll.addEventListener('click', () => {
+  const background = activeBackground();
+  if (!background) return;
+  const keys = targetLayers();
+  for (const other of state.backgrounds) {
+    if (other === background) continue;
+    for (const key of keys) other.transform[key] = { ...background.transform[key] };
+  }
+  setStatus(`Applied ${keys.length === 1 ? keys[0] : 'all layers'} to all ${state.backgrounds.length} backgrounds.`);
+});
+
+/* ---------- drag to move on the preview ---------- */
+
+let drag = null;
+
+ui.preview.addEventListener('pointerdown', (e) => {
+  const layer = activeLayer();
+  if (!layer) return;
+  ui.preview.setPointerCapture(e.pointerId);
+  ui.preview.classList.add('dragging');
+  drag = { startX: e.clientX, startY: e.clientY, originX: layer.x, originY: layer.y };
+});
+
+ui.preview.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  const rect = ui.preview.getBoundingClientRect();
+  // Slider units span -100..100 across the canvas, i.e. 200 units per width.
+  updateLayer({
+    x: drag.originX + ((e.clientX - drag.startX) / rect.width) * 200,
+    y: drag.originY + ((e.clientY - drag.startY) / rect.height) * 200,
+  });
+});
+
+['pointerup', 'pointercancel'].forEach((type) =>
+  ui.preview.addEventListener(type, () => { drag = null; ui.preview.classList.remove('dragging'); }));
+
+/* ---------- rendering ---------- */
+
+const toCanvasX = (x, size) => size / 2 + (x / 100) * (size / 2);
+const toCanvasY = (y, size) => size / 2 + (y / 100) * (size / 2);
+
+function drawCover(ctx, img, size) {
+  const scale = Math.max(size / img.width, size / img.height);
+  const w = img.width * scale;
+  const h = img.height * scale;
+  ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+}
+
+function drawObject(ctx, img, size, t) {
+  // 100% == the object fits inside 70% of the canvas.
+  const base = (size * 0.7) / Math.max(img.width, img.height);
+  const w = img.width * base * (t.scale / 100);
+  const h = img.height * base * (t.scale / 100);
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.shadowBlur = size * 0.02;
+  ctx.shadowOffsetY = size * 0.008;
+  ctx.drawImage(img, toCanvasX(t.x, size) - w / 2, toCanvasY(t.y, size) - h / 2, w, h);
+  ctx.restore();
+}
+
+function wrapText(ctx, text, maxWidth, maxLines) {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = '';
+  for (const word of words) {
+    const candidate = line ? `${line} ${word}` : word;
+    if (ctx.measureText(candidate).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+      if (lines.length === maxLines) break;
+    } else {
+      line = candidate;
+    }
+  }
+  if (lines.length < maxLines && line) lines.push(line);
+  // Ellipsize if the text ran past the line budget.
+  if (lines.length === maxLines) {
+    const consumed = lines.join(' ').split(/\s+/).length;
+    if (consumed < words.length) {
+      let last = lines[maxLines - 1];
+      while (last && ctx.measureText(`${last}…`).width > maxWidth) last = last.slice(0, -1).trimEnd();
+      lines[maxLines - 1] = `${last}…`;
+    }
+  }
+  return lines;
+}
+
+function drawTextLayer(ctx, size, text, t, kind) {
+  if (!text) return;
+
+  const fontSize = size * (kind === 'brand' ? 0.032 : 0.055) * (t.scale / 100);
+  const font = `${kind === 'brand' ? 700 : 600} ${fontSize}px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif`;
+
+  ctx.save();
+  ctx.font = font;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  // No band behind the text — a soft shadow keeps it legible over busy photos.
+  ctx.shadowColor = 'rgba(0,0,0,0.55)';
+  ctx.shadowBlur = fontSize * 0.35;
+  ctx.shadowOffsetY = fontSize * 0.06;
+
+  const cx = toCanvasX(t.x, size);
+  const cy = toCanvasY(t.y, size);
+
+  if (kind === 'brand') {
+    ctx.letterSpacing = `${fontSize * 0.14}px`;
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.fillText(text.toUpperCase(), cx, cy);
+  } else {
+    const lines = wrapText(ctx, text, size * 0.9, 2);
+    const lineHeight = fontSize * 1.2;
+    let y = cy - ((lines.length - 1) * lineHeight) / 2;
+    ctx.fillStyle = '#ffffff';
+    for (const line of lines) {
+      ctx.fillText(line, cx, y);
+      y += lineHeight;
+    }
+  }
+  ctx.restore();
+}
+
+function compose(canvas, background, size) {
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, size, size);
+  ctx.imageSmoothingQuality = 'high';
+  if (!background) return;
+
+  drawCover(ctx, background.img, size);
+  if (state.object) drawObject(ctx, state.object.img, size, background.transform.object);
+  if (ui.showText.checked) {
+    drawTextLayer(ctx, size, ui.brandName.value.trim(), background.transform.brand, 'brand');
+    drawTextLayer(ctx, size, ui.name.value.trim(), background.transform.name, 'name');
+  }
+}
+
+function render() {
+  compose(ui.preview, activeBackground(), Number(ui.outputSize.value));
+  refreshDownload();
+}
+
+[ui.name, ui.brandName].forEach((input) => input.addEventListener('input', render));
+[ui.showText, ui.outputSize].forEach((input) => input.addEventListener('change', render));
+
+/* ---------- export ---------- */
+
+function extensionOf(file) {
+  const fromName = file.name.match(/\.[a-z0-9]+$/i);
+  if (fromName) return fromName[0].toLowerCase();
+  return file.type === 'image/jpeg' ? '.jpg' : '.png';
+}
+
+function safeSku(value) {
+  return value.trim().replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, '-');
+}
+
+function missingPieces() {
+  const missing = [];
+  if (!safeSku(ui.sku.value)) missing.push('SKU');
+  if (!state.object) missing.push('object photo');
+  if (!state.backgrounds.length) missing.push('at least 1 background');
+  return missing;
+}
+
+function refreshDownload() {
+  const missing = missingPieces();
+  ui.download.disabled = missing.length > 0;
+  const sku = safeSku(ui.sku.value);
+  ui.download.textContent = `Download ${sku ? `${sku}.zip` : 'sku.zip'}`;
+  if (missing.length) setStatus(`Needs: ${missing.join(', ')}`);
+  else setStatus(`Ready — ${state.backgrounds.length} image${state.backgrounds.length > 1 ? 's' : ''}`);
+}
+
+ui.sku.addEventListener('input', refreshDownload);
+
+const toBlob = (canvas) => new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+
+ui.download.addEventListener('click', async () => {
+  const sku = safeSku(ui.sku.value);
+  ui.download.disabled = true;
+  setStatus('Rendering…');
+
+  try {
+    const size = Number(ui.outputSize.value);
+    const canvas = document.createElement('canvas');
+    const files = [];
+
+    for (let i = 0; i < state.backgrounds.length; i++) {
+      setStatus(`Rendering ${i + 1}/${state.backgrounds.length}…`);
+      compose(canvas, state.backgrounds[i], size);
+      const blob = await toBlob(canvas);
+      files.push({
+        name: `cover_shopee_${i + 1}.png`,
+        data: new Uint8Array(await blob.arrayBuffer()),
+      });
+    }
+
+    // Detail photos go in as uploaded — no compositing, no re-encoding.
+    for (let i = 0; i < state.details.length; i++) {
+      const { file } = state.details[i];
+      files.push({
+        name: `detail_${i + 1}${extensionOf(file)}`,
+        data: new Uint8Array(await file.arrayBuffer()),
+      });
+    }
+
+    const zip = createZip(files);
+    const url = URL.createObjectURL(zip);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${sku}.zip`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    setStatus(`Downloaded ${sku}.zip (${files.length} images)`);
+  } catch (error) {
+    fail(error);
+  } finally {
+    render();
+  }
+});
+
+function setStatus(message) { ui.status.textContent = message; }
+function fail(error) { console.error(error); setStatus(error.message || String(error)); }
+
+syncBackgrounds();
