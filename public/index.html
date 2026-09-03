@@ -32,6 +32,10 @@
         <span>Brand</span>
         <input id="brandName" type="text" placeholder="Scarlet Parts" autocomplete="off" />
       </label>
+      <label class="field">
+        <span>Part number</span>
+        <input id="partNumber" type="text" placeholder="4Y2-F4101-01" autocomplete="off" />
+      </label>
     </section>
 
     <section class="block">
@@ -88,6 +92,18 @@
         <button class="seg active" data-layer="object">Object</button>
         <button class="seg" data-layer="name">Item name</button>
         <button class="seg" data-layer="brand">Brand</button>
+        <button class="seg" data-layer="partNumber">Part no.</button>
+      </div>
+
+      <div id="typography">
+        <label class="field">
+          <span>Font</span>
+          <select id="fontFamily"></select>
+        </label>
+        <div class="btn-row style-row">
+          <button id="bold" class="btn btn-toggle" title="Bold"><b>B</b></button>
+          <button id="italic" class="btn btn-toggle" title="Italic"><i>I</i></button>
+        </div>
       </div>
 
       <label class="field">
@@ -105,7 +121,21 @@
 
       <label class="check">
         <input id="allLayers" type="checkbox" />
-        <span>Buttons below act on all three layers</span>
+        <span>Buttons below act on all four layers</span>
+      </label>
+
+      <label class="field">
+        <span>Store font preset</span>
+        <select id="preset">
+          <option value="">Apply a preset…</option>
+          <option value="scarletparts">Scarlet Parts — Anton italic</option>
+          <option value="motoparts">Motoparts — Antonio</option>
+          <option value="precisionbike">Precision Bike — Antonio italic</option>
+          <option value="omega">Omega — Antonio</option>
+          <option value="partzilla">Partzilla — Antonio italic</option>
+          <option value="origin">Origin Motors — Antonio</option>
+        </select>
+        <small>Sets fonts for name, brand and part number on this background.</small>
       </label>
 
       <div class="btn-row">
@@ -127,7 +157,7 @@
       </label>
       <label class="check">
         <input id="showText" type="checkbox" checked />
-        <span>Show name &amp; brand on the image</span>
+        <span>Show text layers on the image</span>
       </label>
     </section>
   </aside>

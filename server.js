@@ -15,10 +15,29 @@ const TYPES = {
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
   '.json': 'application/json; charset=utf-8',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
 };
+
+const FONT_EXTENSIONS = ['.ttf', '.otf', '.woff', '.woff2'];
 
 const server = http.createServer((req, res) => {
   const urlPath = decodeURIComponent(req.url.split('?')[0]);
+
+  // Whatever font files sit in public/fonts are offered to the page.
+  if (urlPath === '/api/fonts') {
+    fs.readdir(path.join(ROOT, 'fonts'), (err, entries) => {
+      const fonts = err
+        ? []
+        : entries.filter((name) => FONT_EXTENSIONS.includes(path.extname(name).toLowerCase()));
+      res.writeHead(200, { 'Content-Type': TYPES['.json'], 'Cache-Control': 'no-cache' });
+      res.end(JSON.stringify(fonts));
+    });
+    return;
+  }
+
   let filePath = path.join(ROOT, urlPath === '/' ? 'index.html' : urlPath);
 
   // Keep every request inside public/.

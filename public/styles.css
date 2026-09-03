@@ -247,3 +247,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .seg:hover:not(:disabled) { color: var(--text); }
 .seg.active { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .seg:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.segmented { flex-wrap: wrap; }
+.segmented .seg { flex: 1 1 40%; }
+
+.style-row { margin-bottom: 14px; }
+.btn-toggle { flex: 0 0 44px; font-size: 15px; line-height: 1; }
+.btn-toggle.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+#typography[hidden] { display: none; }

@@ -1,18 +1,21 @@
 import { createZip } from './zip.js';
 
 const MAX_BACKGROUNDS = 6;
-const LAYERS = ['object', 'name', 'brand'];
+const LAYERS = ['object', 'name', 'brand', 'partNumber'];
+const TEXT_LAYERS = ['name', 'brand', 'partNumber'];
+const FALLBACK_STACK = '"Arial Narrow", Arial, Helvetica, sans-serif';
 
 const el = (id) => document.getElementById(id);
 const ui = {
-  sku: el('sku'), name: el('name'), brandName: el('brandName'),
+  sku: el('sku'), name: el('name'), brandName: el('brandName'), partNumber: el('partNumber'),
   objectDrop: el('objectDrop'), objectInput: el('objectInput'),
   objectThumb: el('objectThumb'), clearObject: el('clearObject'),
   bgDrop: el('bgDrop'), bgInput: el('bgInput'), bgList: el('bgList'), bgCount: el('bgCount'),
   detailDrop: el('detailDrop'), detailInput: el('detailInput'),
   detailList: el('detailList'), detailCount: el('detailCount'),
   preview: el('preview'), status: el('status'), download: el('download'),
-  layerTabs: el('layerTabs'),
+  layerTabs: el('layerTabs'), typography: el('typography'),
+  fontFamily: el('fontFamily'), bold: el('bold'), italic: el('italic'), preset: el('preset'),
   scale: el('scale'), posX: el('posX'), posY: el('posY'),
   scaleValue: el('scaleValue'), xValue: el('xValue'), yValue: el('yValue'),
   reset: el('reset'), applyAll: el('applyAll'), allLayers: el('allLayers'),
@@ -23,15 +26,22 @@ const ui = {
 // Placement is per background, per layer. x/y run -100..100 across the canvas.
 const DEFAULTS = {
   object: { scale: 100, x: 0, y: 0 },
-  brand: { scale: 100, x: 0, y: 58 },
-  name: { scale: 100, x: 0, y: 72 },
+  brand: { scale: 100, x: 0, y: -78, font: '', bold: true, italic: false },
+  name: { scale: 100, x: 0, y: 58, font: '', bold: true, italic: false },
+  partNumber: { scale: 100, x: 0, y: 74, font: '', bold: false, italic: false },
 };
 
-const newTransform = () => ({
-  object: { ...DEFAULTS.object },
-  brand: { ...DEFAULTS.brand },
-  name: { ...DEFAULTS.name },
-});
+// Font pairings the six storefronts use. '' means the system fallback stack.
+const PRESETS = {
+  scarletparts: { name: { font: 'Anton', italic: true }, secondary: { font: 'Calps', italic: false } },
+  motoparts: { name: { font: 'Antonio', italic: false }, secondary: { font: 'Calps', italic: false } },
+  precisionbike: { name: { font: 'Antonio', italic: true }, secondary: { font: 'Calps', italic: false } },
+  omega: { name: { font: 'Antonio', italic: false }, secondary: { font: 'Calps', italic: false } },
+  partzilla: { name: { font: 'Antonio', italic: true }, secondary: { font: 'Calps', italic: false } },
+  origin: { name: { font: 'Antonio', italic: false }, secondary: { font: 'Calps', italic: false } },
+};
+
+const newTransform = () => Object.fromEntries(LAYERS.map((key) => [key, { ...DEFAULTS[key] }]));
 
 const state = {
   object: null,           // { img, url }
@@ -39,9 +49,74 @@ const state = {
   details: [],            // { file, url } — copied into the zip untouched
   active: 0,
   layer: 'object',
+  fonts: new Set(),
 };
 
 const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
+
+/* ---------- fonts ---------- */
+
+const WEIGHTS = {
+  thin: 100, extralight: 200, ultralight: 200, light: 300, regular: 400, normal: 400,
+  book: 400, medium: 500, semibold: 600, demibold: 600, bold: 700, extrabold: 800,
+  ultrabold: 800, black: 900, heavy: 900,
+};
+
+// "Calps-BoldItalic.otf" -> family "Calps", weight 700, italic.
+function describeFont(filename) {
+  const variable = /\[[^\]]*\]/.test(filename);
+  const stem = filename.replace(/\.[^.]+$/, '').replace(/\[[^\]]*\]/g, '');
+  const tokens = stem.split(/[-_\s]+/).filter(Boolean);
+
+  let weight = variable ? '1 1000' : 400;
+  let style = 'normal';
+  while (tokens.length > 1) {
+    const token = tokens[tokens.length - 1].toLowerCase();
+    const withoutItalic = token.replace(/italic|oblique/g, '');
+    if (!/italic|oblique/.test(token) && !(token in WEIGHTS)) break;
+    if (/italic|oblique/.test(token)) style = 'italic';
+    if (withoutItalic in WEIGHTS) weight = WEIGHTS[withoutItalic];
+    tokens.pop();
+  }
+  return { family: tokens.join(' '), weight: String(weight), style };
+}
+
+async function loadFonts() {
+  let filenames = [];
+  try {
+    filenames = await (await fetch('api/fonts')).json();
+  } catch {
+    setStatus('Could not list public/fonts — using system fonts only.');
+  }
+
+  const families = new Set();
+  await Promise.all(filenames.map(async (filename) => {
+    const { family, weight, style } = describeFont(filename);
+    try {
+      const face = new FontFace(family, `url("fonts/${encodeURIComponent(filename)}")`, { weight, style });
+      document.fonts.add(await face.load());
+      families.add(family);
+    } catch (error) {
+      console.warn(`Could not load font ${filename}`, error);
+    }
+  }));
+
+  // Preset families with no file on disk still appear, greyed, so the choice is visible.
+  const referenced = new Set(Object.values(PRESETS).flatMap((p) => [p.name.font, p.secondary.font]));
+  const options = [new Option('System sans-serif', '')];
+  for (const family of [...families].sort()) options.push(new Option(family, family));
+  for (const family of [...referenced].sort()) {
+    if (!families.has(family)) {
+      const option = new Option(`${family} (file missing)`, family);
+      option.dataset.missing = 'true';
+      options.push(option);
+    }
+  }
+  ui.fontFamily.replaceChildren(...options);
+  state.fonts = families;
+  syncControls();
+  render();
+}
 
 /* ---------- loading images ---------- */
 
@@ -197,6 +272,19 @@ function syncControls() {
   ui.scaleValue.textContent = `${Math.round(value.scale)}%`;
   ui.xValue.textContent = Math.round(value.x);
   ui.yValue.textContent = Math.round(value.y);
+
+  // Typography belongs to the text layers only.
+  const isText = TEXT_LAYERS.includes(state.layer);
+  ui.typography.hidden = !isText;
+  ui.preset.disabled = disabled;
+  if (isText) {
+    ui.fontFamily.value = value.font ?? '';
+    ui.fontFamily.disabled = disabled;
+    ui.bold.disabled = disabled;
+    ui.italic.disabled = disabled;
+    ui.bold.classList.toggle('on', Boolean(value.bold));
+    ui.italic.classList.toggle('on', Boolean(value.italic));
+  }
 }
 
 function updateLayer(patch) {
@@ -211,6 +299,28 @@ function updateLayer(patch) {
 }
 
 const targetLayers = () => (ui.allLayers.checked ? LAYERS : [state.layer]);
+
+ui.fontFamily.addEventListener('change', () => updateLayer({ font: ui.fontFamily.value }));
+ui.bold.addEventListener('click', () => updateLayer({ bold: !activeLayer()?.bold }));
+ui.italic.addEventListener('click', () => updateLayer({ italic: !activeLayer()?.italic }));
+
+ui.preset.addEventListener('change', () => {
+  const background = activeBackground();
+  const preset = PRESETS[ui.preset.value];
+  if (!background || !preset) return;
+  Object.assign(background.transform.name, preset.name);
+  Object.assign(background.transform.brand, preset.secondary);
+  Object.assign(background.transform.partNumber, preset.secondary);
+  ui.preset.value = '';
+  syncControls();
+  render();
+  // After render(), which resets the status line.
+  const missing = [preset.name.font, preset.secondary.font]
+    .filter((family) => family && !state.fonts.has(family));
+  setStatus(missing.length
+    ? `Preset applied — ${[...new Set(missing)].join(', ')} not in public/fonts, falling back.`
+    : `Preset applied to background ${state.active + 1}.`);
+});
 
 ui.scale.addEventListener('input', () => updateLayer({ scale: Number(ui.scale.value) }));
 ui.posX.addEventListener('input', () => updateLayer({ x: Number(ui.posX.value) }));
@@ -313,14 +423,21 @@ function wrapText(ctx, text, maxWidth, maxLines) {
   return lines;
 }
 
+const BASE_SIZE = { name: 0.055, brand: 0.032, partNumber: 0.030 };
+
+function fontString(t, kind, pixels) {
+  const family = t.font ? `"${t.font}", ${FALLBACK_STACK}` : FALLBACK_STACK;
+  const weight = t.bold ? 700 : 400;
+  return `${t.italic ? 'italic ' : ''}${weight} ${pixels}px ${family}`;
+}
+
 function drawTextLayer(ctx, size, text, t, kind) {
   if (!text) return;
 
-  const fontSize = size * (kind === 'brand' ? 0.032 : 0.055) * (t.scale / 100);
-  const font = `${kind === 'brand' ? 700 : 600} ${fontSize}px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif`;
+  const fontSize = size * BASE_SIZE[kind] * (t.scale / 100);
 
   ctx.save();
-  ctx.font = font;
+  ctx.font = fontString(t, kind, fontSize);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   // No band behind the text — a soft shadow keeps it legible over busy photos.
@@ -331,11 +448,7 @@ function drawTextLayer(ctx, size, text, t, kind) {
   const cx = toCanvasX(t.x, size);
   const cy = toCanvasY(t.y, size);
 
-  if (kind === 'brand') {
-    ctx.letterSpacing = `${fontSize * 0.14}px`;
-    ctx.fillStyle = 'rgba(255,255,255,0.92)';
-    ctx.fillText(text.toUpperCase(), cx, cy);
-  } else {
+  if (kind === 'name') {
     const lines = wrapText(ctx, text, size * 0.9, 2);
     const lineHeight = fontSize * 1.2;
     let y = cy - ((lines.length - 1) * lineHeight) / 2;
@@ -344,6 +457,10 @@ function drawTextLayer(ctx, size, text, t, kind) {
       ctx.fillText(line, cx, y);
       y += lineHeight;
     }
+  } else {
+    ctx.letterSpacing = `${fontSize * (kind === 'brand' ? 0.14 : 0.08)}px`;
+    ctx.fillStyle = kind === 'brand' ? 'rgba(255,255,255,0.92)' : '#ffffff';
+    ctx.fillText(text.toUpperCase(), cx, cy);
   }
   ctx.restore();
 }
@@ -361,6 +478,7 @@ function compose(canvas, background, size) {
   if (ui.showText.checked) {
     drawTextLayer(ctx, size, ui.brandName.value.trim(), background.transform.brand, 'brand');
     drawTextLayer(ctx, size, ui.name.value.trim(), background.transform.name, 'name');
+    drawTextLayer(ctx, size, ui.partNumber.value.trim(), background.transform.partNumber, 'partNumber');
   }
 }
 
@@ -369,7 +487,7 @@ function render() {
   refreshDownload();
 }
 
-[ui.name, ui.brandName].forEach((input) => input.addEventListener('input', render));
+[ui.name, ui.brandName, ui.partNumber].forEach((input) => input.addEventListener('input', render));
 [ui.showText, ui.outputSize].forEach((input) => input.addEventListener('change', render));
 
 /* ---------- export ---------- */
@@ -453,3 +571,4 @@ function setStatus(message) { ui.status.textContent = message; }
 function fail(error) { console.error(error); setStatus(error.message || String(error)); }
 
 syncBackgrounds();
+loadFonts();
