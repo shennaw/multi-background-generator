@@ -1,8 +1,11 @@
 # Fonts
 
-Every `.ttf`, `.otf`, `.woff` or `.woff2` file dropped in this folder is loaded
-by the app on startup and appears in the Font dropdown. Restart is not needed —
-just reload the page.
+Every `.ttf`, `.otf`, `.woff` or `.woff2` file in this folder is loaded by the
+app on startup and appears in the Font dropdown.
+
+The easiest way to add one is the **Fonts** panel in the app — drop a font file
+there and it lands here, ready to use straight away. Copying a file in by hand
+works too; reload the page afterwards. No server restart is needed either way.
 
 The family name comes from the filename, with weight/style suffixes stripped:
 
@@ -20,7 +23,9 @@ The family name comes from the filename, with weight/style suffixes stripped:
 
 ## Not bundled
 
-- **Calps** is a commercial font and cannot be redistributed here. Copy your
-  licensed file into this folder (e.g. `Calps-Regular.otf`) and it will show up
-  in the Font dropdown. Until then, layers set to Calps fall back to a system
-  sans-serif.
+- **Calps** is a commercial font and cannot be redistributed here. Add your
+  licensed file (e.g. `Calps-Regular.otf`) and it will show up in the Font
+  dropdown. Until then, layers set to Calps fall back to a system sans-serif.
+
+Files added this way are gitignored — only the bundled open-licence fonts are
+tracked, so your licensed files stay out of the repository.

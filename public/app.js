@@ -17,6 +17,8 @@ const ui = {
   layerTabs: el('layerTabs'), typography: el('typography'),
   fontFamily: el('fontFamily'), bold: el('bold'), italic: el('italic'),
   color: el('color'), alignRow: el('alignRow'), preset: el('preset'),
+  fontDrop: el('fontDrop'), fontInput: el('fontInput'),
+  fontList: el('fontList'), fontCount: el('fontCount'),
   scale: el('scale'), posX: el('posX'), posY: el('posY'),
   scaleValue: el('scaleValue'), xValue: el('xValue'), yValue: el('yValue'),
   reset: el('reset'), applyAll: el('applyAll'), allLayers: el('allLayers'),
@@ -115,8 +117,45 @@ async function loadFonts() {
   }
   ui.fontFamily.replaceChildren(...options);
   state.fonts = families;
+
+  ui.fontCount.textContent = families.size;
+  const missing = [...referenced].filter((family) => !families.has(family)).sort();
+  ui.fontList.replaceChildren();
+  ui.fontList.append([...families].sort().join(', ') || 'No font files yet.');
+  if (missing.length) {
+    const note = document.createElement('span');
+    note.className = 'missing';
+    note.textContent = ` — still missing: ${missing.join(', ')}`;
+    ui.fontList.append(note);
+  }
+
   syncControls();
   render();
+}
+
+const FONT_PATTERN = /\.(ttf|otf|woff2?)$/i;
+
+async function uploadFonts(files) {
+  const fonts = files.filter((file) => FONT_PATTERN.test(file.name));
+  if (!fonts.length) {
+    setStatus('Fonts must be .ttf, .otf, .woff or .woff2 files.');
+    return;
+  }
+
+  for (const file of fonts) {
+    setStatus(`Saving ${file.name}…`);
+    const response = await fetch(`api/fonts/${encodeURIComponent(file.name)}`, {
+      method: 'PUT',
+      body: file,
+    });
+    if (!response.ok) {
+      const { error } = await response.json().catch(() => ({}));
+      throw new Error(error || `Could not save ${file.name}`);
+    }
+  }
+
+  await loadFonts();
+  setStatus(`Added ${fonts.map((f) => f.name).join(', ')}.`);
 }
 
 /* ---------- loading images ---------- */
@@ -186,10 +225,11 @@ function syncDetails() {
 
 /* ---------- drop zones ---------- */
 
-function wireDrop(zone, input, onFiles) {
+function wireDrop(zone, input, onFiles, { images = true } = {}) {
+  const accept = (list) => (images ? imageFiles(list) : Array.from(list));
   zone.addEventListener('click', () => input.click());
   input.addEventListener('change', () => {
-    if (input.files.length) onFiles(imageFiles(input.files));
+    if (input.files.length) onFiles(accept(input.files));
     input.value = '';
   });
   ['dragenter', 'dragover'].forEach((type) =>
@@ -197,7 +237,7 @@ function wireDrop(zone, input, onFiles) {
   ['dragleave', 'drop'].forEach((type) =>
     zone.addEventListener(type, (e) => { e.preventDefault(); zone.classList.remove('over'); }));
   zone.addEventListener('drop', (e) => {
-    const files = imageFiles(e.dataTransfer.files);
+    const files = accept(e.dataTransfer.files);
     if (files.length) onFiles(files);
   });
 }
@@ -205,6 +245,7 @@ function wireDrop(zone, input, onFiles) {
 wireDrop(ui.objectDrop, ui.objectInput, (files) => setObject(files[0]).catch(fail));
 wireDrop(ui.bgDrop, ui.bgInput, (files) => addBackgrounds(files).catch(fail));
 wireDrop(ui.detailDrop, ui.detailInput, (files) => addDetails(files).catch(fail));
+wireDrop(ui.fontDrop, ui.fontInput, (files) => uploadFonts(files).catch(fail), { images: false });
 
 ui.clearObject.addEventListener('click', (e) => {
   e.stopPropagation();

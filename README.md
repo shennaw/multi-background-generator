@@ -50,11 +50,16 @@ Placement is stored per background, so each shot can be framed differently.
 ## Fonts
 
 **Anton** and **Antonio** ship with the app (SIL Open Font License). **Calps** is
-commercial and is not included — drop your licensed file into `public/fonts/`
-and reload; layers set to Calps fall back to a system sans-serif until you do.
+commercial and is not included — layers set to Calps fall back to a system
+sans-serif until you supply it.
 
-Any font file in `public/fonts/` is picked up automatically. See
-`public/fonts/README.md` for the filename-to-family rules.
+To add a font, drop it on the **Fonts** panel in the app (`.ttf`, `.otf`,
+`.woff`, `.woff2`). It is saved into `public/fonts/` and available immediately;
+the panel lists what is loaded and what a preset still expects. Copying files
+into `public/fonts/` by hand works too — reload the page afterwards.
+
+Fonts you add are gitignored, so a licensed file will not be committed by
+accident. See `public/fonts/README.md` for the filename-to-family rules.
 
 | Storefront     | Item name       | Brand & part number |
 |----------------|-----------------|---------------------|

@@ -1,3 +1,10 @@
 .DS_Store
 node_modules/
 *.zip
+
+# Fonts you add are yours — don't commit licensed files.
+public/fonts/*
+!public/fonts/README.md
+!public/fonts/OFL-*.txt
+!public/fonts/Anton-Regular.ttf
+!public/fonts/Antonio[[]wght[]].ttf

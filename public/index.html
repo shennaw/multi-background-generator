@@ -151,6 +151,18 @@
     </section>
 
     <section class="block">
+      <h2>Fonts <span class="counter" id="fontCount">0</span></h2>
+      <div id="fontDrop" class="drop drop-slim">
+        <input id="fontInput" type="file" accept=".ttf,.otf,.woff,.woff2,font/*" multiple hidden />
+        <div class="drop-inner">
+          <strong>Drop font files</strong>
+          <small>.ttf .otf .woff .woff2 — saved into public/fonts</small>
+        </div>
+      </div>
+      <p class="muted font-list" id="fontList"></p>
+    </section>
+
+    <section class="block">
       <h2>Output</h2>
       <label class="field">
         <span>Size</span>
