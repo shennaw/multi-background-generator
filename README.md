@@ -23,15 +23,15 @@ Your browser opens at http://localhost:5173.
 
 ## Use it
 
-1. Fill in **SKU**, **Item name**, **Brand**, and **Part number**.
+1. Fill in **SKU**, **Item name**, **Jenis Motor**, and **Part number**.
 2. Drop the **object photo** (PNG with a transparent background looks best).
 3. Drop up to **6 backgrounds**.
    Optionally drop any number of **detail photos** — these are copied into the
    zip exactly as uploaded, with no compositing or re-encoding.
 4. Click a background thumbnail to select it, then pick a layer —
-   **Object**, **Item name**, **Brand**, or **Part no.** Each layer has its own
-   scale, position, font, bold, italic, colour and alignment, all stored per
-   background —
+   **Object**, **Item name**, **Jenis Motor**, or **Part no.** Each layer has
+   its own scale, position, font, bold, italic, drop shadow, colour and
+   alignment, all stored per background —
    so each of the six storefronts can use its own typography. Drag on the canvas
    to move the selected layer, or use the sliders.
    Alignment sets which edge of the text sits on the anchor point, so left- or
@@ -61,7 +61,7 @@ into `public/fonts/` by hand works too — reload the page afterwards.
 Fonts you add are gitignored, so a licensed file will not be committed by
 accident. See `public/fonts/README.md` for the filename-to-family rules.
 
-| Storefront     | Item name       | Brand & part number |
+| Storefront     | Item name       | Jenis motor & part no. |
 |----------------|-----------------|---------------------|
 | Scarlet Parts  | Anton *italic*  | Calps               |
 | Motoparts      | Antonio         | Calps               |

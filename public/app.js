@@ -3,6 +3,7 @@ import { createZip } from './zip.js';
 const MAX_BACKGROUNDS = 6;
 const LAYERS = ['object', 'name', 'brand', 'partNumber'];
 const TEXT_LAYERS = ['name', 'brand', 'partNumber'];
+const LABELS = { object: 'object', name: 'item name', brand: 'jenis motor', partNumber: 'part number' };
 const FALLBACK_STACK = '"Arial Narrow", Arial, Helvetica, sans-serif';
 
 const el = (id) => document.getElementById(id);
@@ -16,7 +17,7 @@ const ui = {
   preview: el('preview'), status: el('status'), download: el('download'),
   layerTabs: el('layerTabs'), typography: el('typography'),
   fontFamily: el('fontFamily'), bold: el('bold'), italic: el('italic'),
-  color: el('color'), alignRow: el('alignRow'), preset: el('preset'),
+  color: el('color'), shadow: el('shadow'), alignRow: el('alignRow'), preset: el('preset'),
   fontDrop: el('fontDrop'), fontInput: el('fontInput'),
   fontList: el('fontList'), fontCount: el('fontCount'),
   scale: el('scale'), posX: el('posX'), posY: el('posY'),
@@ -29,9 +30,9 @@ const ui = {
 // Placement is per background, per layer. x/y run -100..100 across the canvas.
 const DEFAULTS = {
   object: { scale: 100, x: 0, y: 0 },
-  brand: { scale: 100, x: 0, y: -78, font: '', bold: true, italic: false, color: '#ffffff', align: 'center' },
-  name: { scale: 100, x: 0, y: 58, font: '', bold: true, italic: false, color: '#ffffff', align: 'center' },
-  partNumber: { scale: 100, x: 0, y: 74, font: '', bold: false, italic: false, color: '#ffffff', align: 'center' },
+  brand: { scale: 100, x: 0, y: -78, font: '', bold: true, italic: false, color: '#ffffff', align: 'center', shadow: true },
+  name: { scale: 100, x: 0, y: 58, font: '', bold: true, italic: false, color: '#ffffff', align: 'center', shadow: true },
+  partNumber: { scale: 100, x: 0, y: 74, font: '', bold: false, italic: false, color: '#ffffff', align: 'center', shadow: true },
 };
 
 // Font pairings the six storefronts use. '' means the system fallback stack.
@@ -326,6 +327,8 @@ function syncControls() {
     ui.italic.disabled = disabled;
     ui.bold.classList.toggle('on', Boolean(value.bold));
     ui.italic.classList.toggle('on', Boolean(value.italic));
+    ui.shadow.classList.toggle('on', value.shadow !== false);
+    ui.shadow.disabled = disabled;
     ui.color.value = value.color ?? '#ffffff';
     ui.color.disabled = disabled;
     for (const button of ui.alignRow.querySelectorAll('.align')) {
@@ -352,6 +355,7 @@ ui.fontFamily.addEventListener('change', () => updateLayer({ font: ui.fontFamily
 ui.bold.addEventListener('click', () => updateLayer({ bold: !activeLayer()?.bold }));
 ui.italic.addEventListener('click', () => updateLayer({ italic: !activeLayer()?.italic }));
 ui.color.addEventListener('input', () => updateLayer({ color: ui.color.value }));
+ui.shadow.addEventListener('click', () => updateLayer({ shadow: activeLayer()?.shadow === false }));
 ui.alignRow.addEventListener('click', (e) => {
   const button = e.target.closest('.align');
   if (button) updateLayer({ align: button.dataset.align });
@@ -385,7 +389,7 @@ ui.reset.addEventListener('click', () => {
   for (const key of targetLayers()) background.transform[key] = { ...DEFAULTS[key] };
   syncControls();
   render();
-  setStatus(ui.allLayers.checked ? 'All layers reset.' : `${state.layer} reset to default position.`);
+  setStatus(ui.allLayers.checked ? 'All layers reset.' : `The ${LABELS[state.layer]} layer was reset.`);
 });
 
 ui.applyAll.addEventListener('click', () => {
@@ -396,7 +400,7 @@ ui.applyAll.addEventListener('click', () => {
     if (other === background) continue;
     for (const key of keys) other.transform[key] = { ...background.transform[key] };
   }
-  setStatus(`Applied ${keys.length === 1 ? keys[0] : 'all layers'} to all ${state.backgrounds.length} backgrounds.`);
+  setStatus(`Applied ${keys.length === 1 ? `the ${LABELS[keys[0]]} layer` : 'all layers'} to all ${state.backgrounds.length} backgrounds.`);
 });
 
 /* ---------- drag to move on the preview ---------- */
@@ -505,10 +509,12 @@ function drawTextLayer(ctx, size, text, t, kind) {
   ctx.textAlign = align;
   ctx.textBaseline = 'middle';
   ctx.fillStyle = t.color ?? '#ffffff';
-  // No band behind the text — a soft shadow keeps it legible over busy photos.
-  ctx.shadowColor = 'rgba(0,0,0,0.55)';
-  ctx.shadowBlur = fontSize * 0.35;
-  ctx.shadowOffsetY = fontSize * 0.06;
+  if (t.shadow !== false) {
+    // No band behind the text — a soft shadow keeps it legible over busy photos.
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur = fontSize * 0.35;
+    ctx.shadowOffsetY = fontSize * 0.06;
+  }
 
   if (kind === 'name') {
     const lines = wrapText(ctx, text, availableWidth(size, cx, align), 2);
@@ -519,7 +525,8 @@ function drawTextLayer(ctx, size, text, t, kind) {
       y += lineHeight;
     }
   } else {
-    ctx.letterSpacing = `${fontSize * (kind === 'brand' ? 0.14 : 0.08)}px`;
+    // Jenis motor tracks like the item name; only the part number is spaced out.
+    if (kind === 'partNumber') ctx.letterSpacing = `${fontSize * 0.08}px`;
     ctx.fillText(text.toUpperCase(), cx, cy);
   }
   ctx.restore();
