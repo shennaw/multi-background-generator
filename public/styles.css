@@ -269,3 +269,5 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 
 .font-list { margin: 10px 0 0; line-height: 1.6; }
 .font-list .missing { color: var(--accent); }
+
+.btn-toggle.btn-wide { flex: 1; font-size: 13px; font-weight: 500; }
