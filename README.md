@@ -41,7 +41,7 @@ Your browser opens at http://localhost:5173.
    copies it to every background; tick **Buttons below act on all three
    layers** to have both act on the object, name, and brand at once.
 5. Click **Download SKU.zip**. Inside `SKU.zip`:
-   - `cover_shopee_1.png` … `cover_shopee_6.png` — the generated covers
+   - `cover_shopee_1.png` … `cover_shopee_6.png` and `cover_tiktok_1.png` — the generated covers
    - `detail_1.<ext>` … `detail_x.<ext>` — the detail photos, byte-for-byte
      as uploaded (the original extension is kept, so a JPEG stays `.jpg`)
 

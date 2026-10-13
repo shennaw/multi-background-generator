@@ -605,7 +605,7 @@ ui.download.addEventListener('click', async () => {
       compose(canvas, state.backgrounds[i], size);
       const blob = await toBlob(canvas);
       files.push({
-        name: `cover_shopee_${i + 1}.png`,
+        name: i < 6 ? `cover_shopee_${i + 1}.png` : `cover_tiktok_${i - 5}.png`,
         data: new Uint8Array(await blob.arrayBuffer()),
       });
     }
