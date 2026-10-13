@@ -48,8 +48,8 @@ const PRESETS = {
 const newTransform = () => Object.fromEntries(LAYERS.map((key) => [key, { ...DEFAULTS[key] }]));
 
 const state = {
-  object: null,           // { img, url }
-  backgrounds: [],        // { img, url, transform }
+  object: null,           // { img, url, file }
+  backgrounds: [],        // { img, url, file, transform }
   details: [],            // { file, url } — copied into the zip untouched
   active: 0,
   layer: 'object',
@@ -165,7 +165,7 @@ function loadImage(file) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
-    img.onload = () => resolve({ img, url });
+    img.onload = () => resolve({ img, url, file });
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(`Could not read ${file.name}`)); };
     img.src = url;
   });
@@ -177,11 +177,15 @@ async function setObject(file) {
   const loaded = await loadImage(file);
   if (state.object) URL.revokeObjectURL(state.object.url);
   state.object = loaded;
-  ui.objectThumb.src = loaded.url;
+  showObject();
+  render();
+}
+
+function showObject() {
+  ui.objectThumb.src = state.object.url;
   ui.objectThumb.hidden = false;
   ui.objectDrop.classList.add('has-image');
   ui.clearObject.hidden = false;
-  render();
 }
 
 async function addBackgrounds(files) {
@@ -207,6 +211,7 @@ async function addDetails(files) {
 }
 
 function syncDetails() {
+  scheduleSave();
   ui.detailCount.textContent = state.details.length;
   ui.detailList.replaceChildren(...state.details.map((detail, i) => {
     const item = document.createElement('div');
@@ -292,6 +297,7 @@ ui.layerTabs.addEventListener('click', (e) => {
   if (!tab) return;
   state.layer = tab.dataset.layer;
   syncControls();
+  scheduleSave();
 });
 
 function syncControls() {
@@ -400,6 +406,7 @@ ui.applyAll.addEventListener('click', () => {
     if (other === background) continue;
     for (const key of keys) other.transform[key] = { ...background.transform[key] };
   }
+  scheduleSave();
   setStatus(`Applied ${keys.length === 1 ? `the ${LABELS[keys[0]]} layer` : 'all layers'} to all ${state.backgrounds.length} backgrounds.`);
 });
 
@@ -552,6 +559,7 @@ function compose(canvas, background, size) {
 function render() {
   compose(ui.preview, activeBackground(), Number(ui.outputSize.value));
   refreshDownload();
+  scheduleSave();
 }
 
 [ui.name, ui.brandName, ui.partNumber].forEach((input) => input.addEventListener('input', render));
@@ -586,7 +594,8 @@ function refreshDownload() {
   else setStatus(`Ready — ${state.backgrounds.length} image${state.backgrounds.length > 1 ? 's' : ''}`);
 }
 
-ui.sku.addEventListener('input', refreshDownload);
+ui.sku.addEventListener('input', () => { refreshDownload(); scheduleSave(); });
+ui.allLayers.addEventListener('change', scheduleSave);
 
 const toBlob = (canvas) => new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 
@@ -634,8 +643,92 @@ ui.download.addEventListener('click', async () => {
   }
 });
 
+/* ---------- keep the session across reloads ---------- */
+
+// Images are kept as the original files in IndexedDB, so closing the tab loses nothing.
+const DB_NAME = 'cover-generator';
+const STORE = 'session';
+let restoring = true;
+let saveTimer = null;
+
+function openDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore(STORE);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function withStore(mode, action) {
+  const db = await openDb();
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, mode);
+      const request = action(tx.objectStore(STORE));
+      tx.oncomplete = () => resolve(request.result);
+      tx.onerror = () => reject(tx.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+function snapshot() {
+  return {
+    fields: { sku: ui.sku.value, name: ui.name.value, brandName: ui.brandName.value, partNumber: ui.partNumber.value },
+    object: state.object?.file ?? null,
+    backgrounds: state.backgrounds.map(({ file, transform }) => ({ file, transform })),
+    details: state.details.map(({ file }) => file),
+    active: state.active,
+    layer: state.layer,
+    outputSize: ui.outputSize.value,
+    showText: ui.showText.checked,
+    allLayers: ui.allLayers.checked,
+  };
+}
+
+function scheduleSave() {
+  if (restoring) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    withStore('readwrite', (store) => store.put(snapshot(), 'current'))
+      .catch((error) => console.warn('Could not save the session', error));
+  }, 300);
+}
+
+async function restore() {
+  const saved = await withStore('readonly', (store) => store.get('current'));
+  if (!saved) return;
+
+  for (const [key, value] of Object.entries(saved.fields ?? {})) ui[key].value = value;
+  ui.outputSize.value = saved.outputSize ?? ui.outputSize.value;
+  ui.showText.checked = saved.showText ?? true;
+  ui.allLayers.checked = Boolean(saved.allLayers);
+
+  if (saved.object) {
+    state.object = await loadImage(saved.object);
+    showObject();
+  }
+  for (const { file, transform } of saved.backgrounds ?? []) {
+    const loaded = await loadImage(file);
+    // Older saves may lack newer layer settings; fill them from the defaults.
+    const merged = Object.fromEntries(LAYERS.map((key) => [key, { ...DEFAULTS[key], ...transform?.[key] }]));
+    state.backgrounds.push({ ...loaded, transform: merged });
+  }
+  state.details = (saved.details ?? []).map((file) => ({ file, url: URL.createObjectURL(file) }));
+  state.active = clamp(saved.active ?? 0, 0, Math.max(0, state.backgrounds.length - 1));
+  if (LAYERS.includes(saved.layer)) state.layer = saved.layer;
+}
+
 function setStatus(message) { ui.status.textContent = message; }
 function fail(error) { console.error(error); setStatus(error.message || String(error)); }
 
-syncBackgrounds();
-loadFonts();
+restore()
+  .catch((error) => console.warn('Could not restore the last session', error))
+  .finally(() => {
+    restoring = false;
+    syncDetails();
+    syncBackgrounds();
+    loadFonts();
+  });

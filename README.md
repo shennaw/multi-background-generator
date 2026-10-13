@@ -47,6 +47,11 @@ Your browser opens at http://localhost:5173.
 
 Placement is stored per background, so each shot can be framed differently.
 
+Your work is saved in the browser as you go — the product fields, object photo,
+backgrounds with their layer settings, and detail photos all come back after
+closing or reloading the page. It is stored per browser, so another browser or
+computer starts empty.
+
 ## Fonts
 
 **Anton** and **Antonio** ship with the app (SIL Open Font License). **Calps** is
