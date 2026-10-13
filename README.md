@@ -1,6 +1,6 @@
 # Cover Generator
 
-Self-hosted tool for compositing one object photo over up to six backgrounds,
+Self-hosted tool for compositing one object photo over up to seven backgrounds,
 burning the item name and brand into each image, and downloading them — along
 with any untouched detail photos — as `SKU.zip`.
 
@@ -25,19 +25,19 @@ Your browser opens at http://localhost:5173.
 
 1. Fill in **SKU**, **Item name**, **Jenis Motor**, and **Part number**.
 2. Drop the **object photo** (PNG with a transparent background looks best).
-3. Drop up to **6 backgrounds**.
+3. Drop up to **7 backgrounds**.
    Optionally drop any number of **detail photos** — these are copied into the
    zip exactly as uploaded, with no compositing or re-encoding.
 4. Click a background thumbnail to select it, then pick a layer —
    **Object**, **Item name**, **Jenis Motor**, or **Part no.** Each layer has
    its own scale, position, font, bold, italic, drop shadow, colour and
    alignment, all stored per background —
-   so each of the six storefronts can use its own typography. Drag on the canvas
+   so each storefront can use its own typography. Drag on the canvas
    to move the selected layer, or use the sliders.
    Alignment sets which edge of the text sits on the anchor point, so left- or
    right-aligned layers stay on a shared margin no matter how long the text is.
    **Store font preset** applies a storefront's font pairing in one click.
-   **Reset to center** restores that layer's default and **Apply to all 6**
+   **Reset to center** restores that layer's default and **Apply to all 7**
    copies it to every background; tick **Buttons below act on all three
    layers** to have both act on the object, name, and brand at once.
 5. Click **Download SKU.zip**. Inside `SKU.zip`:

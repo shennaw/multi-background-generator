@@ -1,6 +1,6 @@
 import { createZip } from './zip.js';
 
-const MAX_BACKGROUNDS = 6;
+const MAX_BACKGROUNDS = 7;
 const LAYERS = ['object', 'name', 'brand', 'partNumber'];
 const TEXT_LAYERS = ['name', 'brand', 'partNumber'];
 const LABELS = { object: 'object', name: 'item name', brand: 'jenis motor', partNumber: 'part number' };
